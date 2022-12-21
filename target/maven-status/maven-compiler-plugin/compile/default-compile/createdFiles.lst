@@ -1,0 +1,4 @@
+io\camunda\connector\UiPathConnectorRequest.class
+io\camunda\connector\Authentication.class
+io\camunda\connector\UiPathConnectorFunction.class
+io\camunda\connector\UiPathConnectorResult.class
