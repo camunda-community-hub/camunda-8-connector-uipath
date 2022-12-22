@@ -17,6 +17,16 @@ public class UiPathConnectorRequest {
   private String tenant;
   private Integer pollingInterval;
 
+  public static final String PACKAGE_NAME = "packageName";
+  public static final String ROBOT_INPUT = "robotInput";
+  public static final String ROBOT_OUTPUT = "robotOutput";
+  public static final String CLIENT_ID = "clientId";
+  public static final String CLIENT_KEY = "clientKey";
+  public static final String ORGANIZATION_NAME = "organizationName";
+  public static final String ORGANIZATION_ID = "organizationId";
+  public static final String TENANT = "tenant";
+  public static final String POLLING_INTERVAL = "pollingInterval";
+
   public UiPathConnectorRequest() {
   }
 

@@ -31,7 +31,7 @@ public class UiPathConnectorFunction implements OutboundConnectorFunction {
   private static final String UIPATH_CONTENT_TYPE = "application/json";
 
   @Override
-  public Object execute(OutboundConnectorContext context) throws Exception {
+  public UiPathConnectorResult execute(OutboundConnectorContext context) throws Exception {
     var connectorRequest = context.getVariablesAsType(UiPathConnectorRequest.class);
     String jsonString = context.getVariables();
     JSONObject json = new JSONObject(jsonString);

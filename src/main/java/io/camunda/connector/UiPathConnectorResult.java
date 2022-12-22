@@ -8,6 +8,8 @@ import java.util.Objects;
 
 public class UiPathConnectorResult {
 
+  public static final String OUTPUT_VARIABLE = "output";
+
   // TODO: define connector result properties, which are returned to the process engine
   private HashMap<String, Object> output = new HashMap();
 
