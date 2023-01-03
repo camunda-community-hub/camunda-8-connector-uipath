@@ -60,6 +60,12 @@
       <version>20220924</version>
     </dependency>
 
+    <dependency>
+      <groupId>io.camunda.connector</groupId>
+      <artifactId>connector-http-json</artifactId>
+      <version>0.14.1</version>
+    </dependency>
+
     <!-- test dependencies -->
     <dependency>
       <groupId>org.junit.jupiter</groupId>

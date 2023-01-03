@@ -1,28 +1,28 @@
 package io.camunda.connector;
 
+import com.google.gson.Gson;
 import io.camunda.connector.api.annotation.OutboundConnector;
 import io.camunda.connector.api.outbound.OutboundConnectorContext;
 import io.camunda.connector.api.outbound.OutboundConnectorFunction;
+import io.camunda.connector.http.HttpJsonFunction;
+import io.camunda.connector.http.model.HttpJsonRequest;
+import io.camunda.connector.http.model.HttpJsonResult;
+import io.camunda.connector.http.auth.Authentication;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Map;
 
 @OutboundConnector(
     name = "UiPathConnector",
-    inputVariables = {"organizationName", "organizationId", "tenant", "clientId", "clientKey", "packageName", "pollingInterval", "robotOutput"},
+    inputVariables = {"organizationName", "organizationId", "tenant", "clientId", "clientKey", "packageName", "pollingInterval"},
     type = UiPathConnectorFunction.TYPE_CONNECTOR)
 
-public class UiPathConnectorFunction implements OutboundConnectorFunction {
+public class UiPathConnectorFunction extends HttpJsonFunction implements OutboundConnectorFunction {
 
   public static final String TYPE_CONNECTOR = "io.camunda:uipath";
   private static final Logger LOGGER = LoggerFactory.getLogger(UiPathConnectorFunction.class);
@@ -30,8 +30,8 @@ public class UiPathConnectorFunction implements OutboundConnectorFunction {
   private static final String UIPATH_AUTH_URL = "https://account.uipath.com/oauth/token";
   private static final String UIPATH_CONTENT_TYPE = "application/json";
 
-  @Override
-  public UiPathConnectorResult execute(OutboundConnectorContext context) throws Exception {
+  //@Override
+  public UiPathConnectorResult execute(OutboundConnectorContext context) throws java.io.IOException {
     var connectorRequest = context.getVariablesAsType(UiPathConnectorRequest.class);
     String jsonString = context.getVariables();
     JSONObject json = new JSONObject(jsonString);
@@ -44,57 +44,69 @@ public class UiPathConnectorFunction implements OutboundConnectorFunction {
     return executeConnector(connectorRequest);
   }
 
-  private UiPathConnectorResult executeConnector(final UiPathConnectorRequest connectorRequest) {
+  private UiPathConnectorResult executeConnector(final UiPathConnectorRequest connectorRequest) throws java.io.IOException {
 
     String output = ""; // Output from UiPath bot
 
     try {
       // Get access token
-      String body = "{\n" +
-              "    \"grant_type\": \"refresh_token\",\n" +
-              "    \"client_id\": \""+connectorRequest.getClientId()+"\",\n" +
-              "    \"refresh_token\": \""+connectorRequest.getClientKey()+"\"\n" +
-              "}";
+      String bodyString = "{\n" +
+            "    \"grant_type\": \"refresh_token\",\n" +
+            "    \"client_id\": \""+connectorRequest.getClientId()+"\",\n" +
+            "    \"refresh_token\": \""+connectorRequest.getClientKey()+"\"\n" +
+            "}";
 
-      HashMap<String, String> map = new HashMap<>();
-      map.put("Content-Type", UIPATH_CONTENT_TYPE);
+      Gson gson = new Gson();
+      Map body = gson.fromJson(bodyString, Map.class);
 
-      HttpResponse<String> response = this.makePOSTCall(UIPATH_AUTH_URL, body, map);
+      HashMap<String, String> headers = new HashMap<>();
+      headers.put("Content-Type", UIPATH_CONTENT_TYPE);
 
-      String access_token = new JSONObject(response.body()).getString("access_token");
+      io.camunda.connector.http.auth.Authentication auth =  new io.camunda.connector.http.auth.NoAuthentication();
+
+      Map respMap = this.makeRESTCAll(UIPATH_AUTH_URL,"POST", auth, headers, body);
+
+      String access_token = respMap.get("access_token").toString();
 
       // Set other headers for next calls
-      map.put("Authorization", "Bearer "+access_token);
-      map.put("X-UIPATH-OrganizationUnitId", connectorRequest.getOrganizationId());
+      headers.put("Authorization", "Bearer "+access_token);
+      headers.put("X-UIPATH-OrganizationUnitId", connectorRequest.getOrganizationId());
+
+      // Set bearer token authorization
+      auth = new io.camunda.connector.http.auth.BearerAuthentication();
 
       // Search for releases based on provided package name in UiPath
-      response = this.makeGETCall(BASE_UIPATH_URL+connectorRequest.getOrganizationName()+"/"+connectorRequest.getTenant()+"/orchestrator_/odata/Releases?$filter=Name%20eq%20'"+connectorRequest.getPackageName()+"'", map);
+      body = gson.fromJson("", Map.class);
+      respMap = this.makeRESTCAll(BASE_UIPATH_URL+connectorRequest.getOrganizationName()+"/"+connectorRequest.getTenant()+"/orchestrator_/odata/Releases?$filter=Name%20eq%20'"+connectorRequest.getPackageName()+"'","GET", auth, headers, body);
+
 
       // Get release key for next call. Need to make sure at least one has been returned
-      JSONArray value = new JSONObject(response.body()).getJSONArray("value");
+      JSONArray value = new JSONObject(respMap).getJSONArray("value");
       String releaseKey = value.getJSONObject(0).getString("Key");
 
       // Now start the job
-      body = "{\"startInfo\":{\"ReleaseKey\":\""+releaseKey+"\",\"Strategy\":\"JobsCount\",\"JobsCount\":1,\"InputArguments\":"+JSONObject.valueToString(connectorRequest.getRobotInput().toString())+"}}";
+      body = gson.fromJson("{\"startInfo\":{\"ReleaseKey\":\""+releaseKey+"\",\"Strategy\":\"JobsCount\",\"JobsCount\":\"1\",\"InputArguments\":"+JSONObject.valueToString(connectorRequest.getRobotInput().toString())+"}}", Map.class);
 
-      response = this.makePOSTCall(BASE_UIPATH_URL+connectorRequest.getOrganizationName()+"/"+connectorRequest.getTenant()+"/orchestrator_/odata/Jobs/UiPath.Server.Configuration.OData.StartJobs", body, map);
+      respMap = this.makeRESTCAll(BASE_UIPATH_URL+connectorRequest.getOrganizationName()+"/"+connectorRequest.getTenant()+"/orchestrator_/odata/Jobs/UiPath.Server.Configuration.OData.StartJobs","POST", auth, headers, body);
 
       // Get Job ID for next call. Need to make sure at least one has been returned
-      value = new JSONObject(response.body()).getJSONArray("value");
+      value = new JSONObject(respMap).getJSONArray("value");
       String jobId = value.getJSONObject(0).getBigInteger("Id").toString();
 
       // Now poll for successful job completion. Retrieve output, if any, and send back to Camunda
       String state = "Pending";
+      body = gson.fromJson("", Map.class);
 
       while(state.equals("Running") || state.equals("Pending")) {
-        response = this.makeGETCall(BASE_UIPATH_URL+connectorRequest.getOrganizationName()+"/"+connectorRequest.getTenant()+"/orchestrator_/odata/Jobs("+jobId+")", map);
+        respMap = this.makeRESTCAll(BASE_UIPATH_URL+connectorRequest.getOrganizationName()+"/"+connectorRequest.getTenant()+"/orchestrator_/odata/Jobs("+jobId+")","GET", auth, headers, body);
 
-        state = new JSONObject(response.body()).getString("State");
+
+        state = new JSONObject(respMap).getString("State");
         Thread.sleep(connectorRequest.getPollingInterval() * 1000);
       }
 
       // Get output
-      output = new JSONObject(response.body()).getString("OutputArguments");
+      output = new JSONObject(respMap).getString("OutputArguments");
 
 
     } catch(Exception e) {
@@ -107,55 +119,25 @@ public class UiPathConnectorFunction implements OutboundConnectorFunction {
     return result;
   }
 
-  private HttpResponse<String> makePOSTCall(String url, String body, HashMap headers) {
+  private Map makeRESTCAll(String url, String method, Authentication auth, Map headers, Map body){
+    HttpJsonRequest httpJsonRequest = new HttpJsonRequest();
+    httpJsonRequest.setUrl(url);
+    httpJsonRequest.setMethod(method);
+    httpJsonRequest.setAuthentication(auth);
+    httpJsonRequest.setHeaders(headers);
+    httpJsonRequest.setBody(body);
 
-    HttpResponse<String> response = null;
+    Map respMap = new HashMap();
 
     try {
-      HttpClient client = HttpClient.newHttpClient();
 
-      HttpRequest request = HttpRequest.newBuilder()
-              .uri(URI.create(url))
-              .headers(this.createHeaderStringArray(headers))
-              .POST(HttpRequest.BodyPublishers.ofString(body))
-              .build();
+      HttpJsonResult httpJsonResult = this.executeRequestDirectly(httpJsonRequest);
+      respMap = (Map) httpJsonResult.getBody();
 
-      response = client.send(request, HttpResponse.BodyHandlers.ofString());
-
-    } catch (IOException | InterruptedException e) {
-        LOGGER.error("Error when executing POST: "+e);
+    } catch (IOException ioe) {
+      LOGGER.error("Error in UiPath API call "+ioe);
     }
-    return response;
-  }
 
-  private HttpResponse<String> makeGETCall(String url, HashMap headers) {
-
-    HttpResponse<String> response = null;
-    try {
-      HttpClient client = HttpClient.newHttpClient();
-      HttpRequest request = HttpRequest.newBuilder()
-              .uri(URI.create(url))
-              .headers(this.createHeaderStringArray(headers))
-              .GET()
-              .build();
-
-      response = client.send(request, HttpResponse.BodyHandlers.ofString());
-
-    } catch (IOException | InterruptedException e) {
-      LOGGER.error("Error when executing GET: "+e);
-    }
-    return response;
-  }
-
-  private String[] createHeaderStringArray (HashMap map) {
-    ArrayList<String> headers = new ArrayList<String>();
-
-    map.forEach((key, value) -> {
-      headers.add(key.toString());
-      headers.add(value.toString());
-    });
-
-    String[] output = Arrays.copyOf(headers.toArray(), headers.size(), String[].class);
-    return output;
+    return respMap;
   }
 }

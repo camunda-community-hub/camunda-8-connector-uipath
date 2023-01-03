@@ -9,7 +9,6 @@ public class UiPathConnectorRequest {
   @NotEmpty
   private String packageName;
   private JSONObject robotInput;
-  private String robotOutput;
   private String clientId;
   private String clientKey;
   private String organizationName;
@@ -45,14 +44,6 @@ public class UiPathConnectorRequest {
   public void setRobotInput(JSONObject robotInput) {
     this.robotInput = robotInput;
   }
-
-  public String getRobotOutput() {
-        return robotOutput;
-    }
-
-  public void setRobotOutput(String robotOutput) {
-        this.robotOutput = robotOutput;
-    }
 
   public String getClientId() {
       return clientId;
