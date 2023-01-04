@@ -64,7 +64,7 @@ public class UiPathConnectorFunction extends HttpJsonFunction implements Outboun
 
       io.camunda.connector.http.auth.Authentication auth =  new io.camunda.connector.http.auth.NoAuthentication();
 
-      Map respMap = this.makeRESTCAll(UIPATH_AUTH_URL,"POST", auth, headers, body);
+      Map respMap = this.makeRESTCall(UIPATH_AUTH_URL,"POST", auth, headers, body);
 
       String access_token = respMap.get("access_token").toString();
 
@@ -77,7 +77,7 @@ public class UiPathConnectorFunction extends HttpJsonFunction implements Outboun
 
       // Search for releases based on provided package name in UiPath
       body = gson.fromJson("", Map.class);
-      respMap = this.makeRESTCAll(BASE_UIPATH_URL+connectorRequest.getOrganizationName()+"/"+connectorRequest.getTenant()+"/orchestrator_/odata/Releases?$filter=Name%20eq%20'"+connectorRequest.getPackageName()+"'","GET", auth, headers, body);
+      respMap = this.makeRESTCall(BASE_UIPATH_URL+connectorRequest.getOrganizationName()+"/"+connectorRequest.getTenant()+"/orchestrator_/odata/Releases?$filter=Name%20eq%20'"+connectorRequest.getPackageName()+"'","GET", auth, headers, body);
 
 
       // Get release key for next call. Need to make sure at least one has been returned
@@ -87,7 +87,7 @@ public class UiPathConnectorFunction extends HttpJsonFunction implements Outboun
       // Now start the job
       body = gson.fromJson("{\"startInfo\":{\"ReleaseKey\":\""+releaseKey+"\",\"Strategy\":\"JobsCount\",\"JobsCount\":\"1\",\"InputArguments\":"+JSONObject.valueToString(connectorRequest.getRobotInput().toString())+"}}", Map.class);
 
-      respMap = this.makeRESTCAll(BASE_UIPATH_URL+connectorRequest.getOrganizationName()+"/"+connectorRequest.getTenant()+"/orchestrator_/odata/Jobs/UiPath.Server.Configuration.OData.StartJobs","POST", auth, headers, body);
+      respMap = this.makeRESTCall(BASE_UIPATH_URL+connectorRequest.getOrganizationName()+"/"+connectorRequest.getTenant()+"/orchestrator_/odata/Jobs/UiPath.Server.Configuration.OData.StartJobs","POST", auth, headers, body);
 
       // Get Job ID for next call. Need to make sure at least one has been returned
       value = new JSONObject(respMap).getJSONArray("value");
@@ -98,7 +98,7 @@ public class UiPathConnectorFunction extends HttpJsonFunction implements Outboun
       body = gson.fromJson("", Map.class);
 
       while(state.equals("Running") || state.equals("Pending")) {
-        respMap = this.makeRESTCAll(BASE_UIPATH_URL+connectorRequest.getOrganizationName()+"/"+connectorRequest.getTenant()+"/orchestrator_/odata/Jobs("+jobId+")","GET", auth, headers, body);
+        respMap = this.makeRESTCall(BASE_UIPATH_URL+connectorRequest.getOrganizationName()+"/"+connectorRequest.getTenant()+"/orchestrator_/odata/Jobs("+jobId+")","GET", auth, headers, body);
 
 
         state = new JSONObject(respMap).getString("State");
@@ -119,7 +119,7 @@ public class UiPathConnectorFunction extends HttpJsonFunction implements Outboun
     return result;
   }
 
-  private Map makeRESTCAll(String url, String method, Authentication auth, Map headers, Map body){
+  private Map makeRESTCall(String url, String method, Authentication auth, Map headers, Map body){
     HttpJsonRequest httpJsonRequest = new HttpJsonRequest();
     httpJsonRequest.setUrl(url);
     httpJsonRequest.setMethod(method);
