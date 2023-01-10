@@ -44,7 +44,7 @@ public class UiPathConnectorFunction extends HttpJsonFunction implements Outboun
     return executeConnector(connectorRequest);
   }
 
-  private UiPathConnectorResult executeConnector(final UiPathConnectorRequest connectorRequest) throws java.io.IOException {
+  private UiPathConnectorResult executeConnector(final UiPathConnectorRequest connectorRequest) {
 
     String output = ""; // Output from UiPath bot
 
@@ -79,7 +79,6 @@ public class UiPathConnectorFunction extends HttpJsonFunction implements Outboun
       body = gson.fromJson("", Map.class);
       respMap = this.makeRESTCall(BASE_UIPATH_URL+connectorRequest.getOrganizationName()+"/"+connectorRequest.getTenant()+"/orchestrator_/odata/Releases?$filter=Name%20eq%20'"+connectorRequest.getPackageName()+"'","GET", auth, headers, body);
 
-
       // Get release key for next call. Need to make sure at least one has been returned
       JSONArray value = new JSONObject(respMap).getJSONArray("value");
       String releaseKey = value.getJSONObject(0).getString("Key");
@@ -100,15 +99,13 @@ public class UiPathConnectorFunction extends HttpJsonFunction implements Outboun
       while(state.equals("Running") || state.equals("Pending")) {
         respMap = this.makeRESTCall(BASE_UIPATH_URL+connectorRequest.getOrganizationName()+"/"+connectorRequest.getTenant()+"/orchestrator_/odata/Jobs("+jobId+")","GET", auth, headers, body);
 
-
         state = new JSONObject(respMap).getString("State");
         Thread.sleep(connectorRequest.getPollingInterval() * 1000);
       }
 
       // Get output
       output = new JSONObject(respMap).getString("OutputArguments");
-
-
+      
     } catch(Exception e) {
       LOGGER.error("Error in UiPath connector "+e);
     }
