@@ -63,7 +63,7 @@
     <dependency>
       <groupId>io.camunda.connector</groupId>
       <artifactId>connector-http-json</artifactId>
-      <version>8.3.3</version>
+      <version>8.4.0</version>
     </dependency>
 
     <!-- test dependencies -->
